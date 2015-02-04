@@ -117,6 +117,7 @@ ERL_NIF_TERM
 snappy_compress_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary input;
+    const char *s;
 
     if (!enif_inspect_iolist_as_binary(env, argv[0], &input))
         return enif_make_badarg(env);
@@ -137,10 +138,11 @@ snappy_compress_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         snappy::Compress(&source, &sink);
         return make_ok(env, enif_make_binary(env, &sink.getBin()));
     } catch(std::bad_alloc e) {
-        return make_error(env, "insufficient_memory");
+        s = "insufficient_memory";
     } catch(...) {
-        return make_error(env, "unknown");
+        s = "unknown";
     }
+    return make_error(env, s);
 }
 
 
@@ -149,6 +151,7 @@ snappy_decompress_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary bin;
     ErlNifBinary ret;
+    const char *s;
 
     if (!enif_inspect_iolist_as_binary(env, argv[0], &bin))
         return enif_make_badarg(env);
@@ -167,33 +170,36 @@ ok:
         size_t len;
 
         if (!snappy::GetUncompressedLength(SC_PTR(bin.data), bin.size, &len))
-            return make_error(env, "data_not_compressed");
+            s = "data_not_compressed";
         else if (!enif_alloc_binary_compat(env, len, &ret))
-            return make_error(env, "insufficient_memory");
+            s = "insufficient_memory";
         else if (!snappy::RawUncompress(SC_PTR(bin.data), bin.size, SC_PTR(ret.data)))
-            return make_error(env, "corrupted_data");
+            s = "corrupted_data";
         else
             goto ok;
     } catch(...) {
-        return make_error(env, "unknown");
+        s = "unknown";
     }
+    return make_error(env, s);
 }
 
 ERL_NIF_TERM snappy_uncompressed_length_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary bin;
-    size_t len;
+    const char *s;
 
     if(!enif_inspect_iolist_as_binary(env, argv[0], &bin))
         return enif_make_badarg(env);
 
     try {
-        return snappy::GetUncompressedLength(SC_PTR(bin.data), bin.size, &len)
-               ? make_ok(env, enif_make_ulong(env, len))
-               : make_error(env, "data_not_compressed");
+        size_t len;
+        if (snappy::GetUncompressedLength(SC_PTR(bin.data), bin.size, &len))
+            return make_ok(env, enif_make_ulong(env, len));
+        s = "data_not_compressed";
     } catch(...) {
-        return make_error(env, "unknown");
+        s = "unknown";
     }
+    return make_error(env, s);
 }
 
 ERL_NIF_TERM snappy_is_valid(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
